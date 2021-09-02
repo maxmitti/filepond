@@ -4984,10 +4984,18 @@
             chunk.status = ChunkStatus.PROCESSING;
             chunk.progress = null;
 
+            var useMultiPartForm = chunkServer.method === 'POST';
+
             // allow parsing of formdata
             var ondata =
                 chunkServer.ondata ||
                 function(fd) {
+                    if (useMultiPartForm) {
+                        if (!fd.append) {
+                            fd = new FormData();
+                        }
+                        fd.append('file', chunk.data);
+                    }
                     return fd;
                 };
             var onerror =
@@ -5008,6 +5016,11 @@
                           'Upload-Length': file.size,
                           'Upload-Name': file.name,
                       });
+
+            if (useMultiPartForm) {
+                // with FormData, the browser will set it automatically
+                delete headers['Content-Type'];
+            }
 
             var request = (chunk.request = sendRequest(
                 ondata(chunk.data),

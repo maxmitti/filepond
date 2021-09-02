@@ -20,7 +20,7 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
     // all chunks
     const chunks = [];
     const { chunkTransferId, chunkServer, chunkSize, chunkRetryDelays } = options;
-    
+
     // default state
     const state = {
         serverId: chunkTransferId,
@@ -36,10 +36,10 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
     const requestTransferId = cb => {
 
         const formData = new FormData();
-        
+
         // add metadata under same name
         if (isObject(metadata)) formData.append(name, JSON.stringify(metadata));
-        
+
         const headers = typeof action.headers === 'function' ? action.headers(file, metadata) : {
             ...action.headers,
             'Upload-Length': file.size
@@ -70,11 +70,11 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
     const requestTransferOffset = cb => {
 
         const requestUrl = buildURL(apiUrl, chunkServer.url, state.serverId);
-        
+
         const headers = typeof action.headers === 'function' ? action.headers(state.serverId) : {
             ...action.headers
         };
-        
+
         const requestParams = {
             headers,
             method: 'HEAD'
@@ -124,7 +124,7 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
 
         // processing is paused, wait here
         if (state.aborted) return;
-        
+
         // get next chunk to process
         chunk = chunk || chunks.find(canProcessChunk);
 
@@ -144,8 +144,18 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
         chunk.status = ChunkStatus.PROCESSING;
         chunk.progress = null;
 
+        const useMultiPartForm = chunkServer.method === 'POST';
+
         // allow parsing of formdata
-        const ondata = chunkServer.ondata || (fd => fd);
+        const ondata = chunkServer.ondata || (fd => {
+            if (useMultiPartForm) {
+                if (!fd.append) {
+                    fd = new FormData;
+                }
+                fd.append('file', chunk.data);
+            }
+            return fd;
+        });
         const onerror = chunkServer.onerror || (res => null);
 
         // send request object
@@ -159,13 +169,18 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
             'Upload-Name': file.name
         };
 
+        if (useMultiPartForm) {
+            // with FormData, the browser will set it automatically
+            delete headers['Content-Type'];
+        }
+
         const request = chunk.request = sendRequest(ondata(chunk.data), requestUrl, {
             ...chunkServer,
             headers
         });
 
         request.onload = () => {
-            
+
             // done!
             chunk.status = ChunkStatus.COMPLETE;
 
@@ -224,7 +239,7 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
         chunk.timeout = setTimeout(() => {
             processChunk(chunk);
         }, chunk.retries.shift());
-        
+
         // we're going to retry
         return true;
     }
@@ -253,7 +268,7 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
         if (totalProcessing >= 1) return;
         processChunk();
     };
-    
+
     const abortChunks = () => {
         chunks.forEach(chunk => {
             clearTimeout(chunk.timeout);
@@ -296,11 +311,11 @@ export const processFileChunked = (apiUrl, action, name, file, metadata, load, e
             processChunks();
         })
     }
-    
+
     return {
         abort: () => {
             state.aborted = true;
             abortChunks();
         }
-    } 
+    }
 };

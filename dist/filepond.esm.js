@@ -2889,8 +2889,20 @@ const processFileChunked = (
         chunk.status = ChunkStatus.PROCESSING;
         chunk.progress = null;
 
+        const useMultiPartForm = chunkServer.method === 'POST';
+
         // allow parsing of formdata
-        const ondata = chunkServer.ondata || (fd => fd);
+        const ondata =
+            chunkServer.ondata ||
+            (fd => {
+                if (useMultiPartForm) {
+                    if (!fd.append) {
+                        fd = new FormData();
+                    }
+                    fd.append('file', chunk.data);
+                }
+                return fd;
+            });
         const onerror = chunkServer.onerror || (res => null);
 
         // send request object
@@ -2906,6 +2918,11 @@ const processFileChunked = (
                       'Upload-Length': file.size,
                       'Upload-Name': file.name,
                   };
+
+        if (useMultiPartForm) {
+            // with FormData, the browser will set it automatically
+            delete headers['Content-Type'];
+        }
 
         const request = (chunk.request = sendRequest(ondata(chunk.data), requestUrl, {
             ...chunkServer,
