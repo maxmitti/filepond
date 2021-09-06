@@ -32,7 +32,7 @@ export const sendRequest = (data, url, options) => {
     url = encodeURI(url);
 
     // if method is GET, add any received data to url
-    
+
     if (isGet(options.method) && data) {
         url = `${url}${encodeURIComponent(
             typeof data === 'string' ? data : JSON.stringify(data)
@@ -42,14 +42,36 @@ export const sendRequest = (data, url, options) => {
     // create request
     const xhr = new XMLHttpRequest();
 
+    let gotProgress = () => {};
+    if (isInt(options.timeout) && options.timeout > 0) {
+        let progressTimeout;
+        let startProgressTimeout = () => {
+            progressTimeout = setTimeout(() => {
+                xhr.onabort = null;
+                xhr.abort();
+                api.ontimeout(xhr);
+            }, options.timeout);
+        };
+        startProgressTimeout();
+
+        gotProgress = (done) => {
+            clearTimeout(progressTimeout);
+            if (!done) {
+                startProgressTimeout();
+            }
+        };
+    }
+
     // progress of load
     const process = isGet(options.method) ? xhr : xhr.upload;
     process.onprogress = e => {
-        
+
         // no progress event when aborted ( onprogress is called once after abort() )
         if (aborted) {
             return;
         }
+
+        gotProgress();
 
         api.onprogress(e.lengthComputable, e.loaded, e.total);
     };
@@ -78,9 +100,10 @@ export const sendRequest = (data, url, options) => {
 
     // load successful
     xhr.onload = () => {
-        
+
         // is classified as valid response
         if (xhr.status >= 200 && xhr.status < 300) {
+            gotProgress(true);
             api.onload(xhr);
         } else {
             api.onerror(xhr);
@@ -97,15 +120,10 @@ export const sendRequest = (data, url, options) => {
     };
 
     // request timeout
-    xhr.ontimeout = () => api.ontimeout(xhr);
+   xhr.ontimeout = () => api.ontimeout(xhr);
 
     // open up open up!
     xhr.open(options.method, url, true);
-
-    // set timeout if defined (do it after open so IE11 plays ball)
-    if (isInt(options.timeout)) {
-        xhr.timeout = options.timeout;
-    }
 
     // add headers
     Object.keys(options.headers).forEach(key => {

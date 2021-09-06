@@ -4595,6 +4595,26 @@
         // create request
         var xhr = new XMLHttpRequest();
 
+        var gotProgress = function gotProgress() {};
+        if (isInt(options.timeout) && options.timeout > 0) {
+            var progressTimeout;
+            var startProgressTimeout = function startProgressTimeout() {
+                progressTimeout = setTimeout(function() {
+                    xhr.onabort = null;
+                    xhr.abort();
+                    api.ontimeout(xhr);
+                }, options.timeout);
+            };
+            startProgressTimeout();
+
+            gotProgress = function gotProgress(done) {
+                clearTimeout(progressTimeout);
+                if (!done) {
+                    startProgressTimeout();
+                }
+            };
+        }
+
         // progress of load
         var process = isGet(options.method) ? xhr : xhr.upload;
         process.onprogress = function(e) {
@@ -4602,6 +4622,8 @@
             if (aborted) {
                 return;
             }
+
+            gotProgress();
 
             api.onprogress(e.lengthComputable, e.loaded, e.total);
         };
@@ -4632,6 +4654,7 @@
         xhr.onload = function() {
             // is classified as valid response
             if (xhr.status >= 200 && xhr.status < 300) {
+                gotProgress(true);
                 api.onload(xhr);
             } else {
                 api.onerror(xhr);
@@ -4656,11 +4679,6 @@
 
         // open up open up!
         xhr.open(options.method, url, true);
-
-        // set timeout if defined (do it after open so IE11 plays ball)
-        if (isInt(options.timeout)) {
-            xhr.timeout = options.timeout;
-        }
 
         // add headers
         Object.keys(options.headers).forEach(function(key) {

@@ -2551,6 +2551,26 @@ const sendRequest = (data, url, options) => {
     // create request
     const xhr = new XMLHttpRequest();
 
+    let gotProgress = () => {};
+    if (isInt(options.timeout) && options.timeout > 0) {
+        let progressTimeout;
+        let startProgressTimeout = () => {
+            progressTimeout = setTimeout(() => {
+                xhr.onabort = null;
+                xhr.abort();
+                api.ontimeout(xhr);
+            }, options.timeout);
+        };
+        startProgressTimeout();
+
+        gotProgress = done => {
+            clearTimeout(progressTimeout);
+            if (!done) {
+                startProgressTimeout();
+            }
+        };
+    }
+
     // progress of load
     const process = isGet(options.method) ? xhr : xhr.upload;
     process.onprogress = e => {
@@ -2558,6 +2578,8 @@ const sendRequest = (data, url, options) => {
         if (aborted) {
             return;
         }
+
+        gotProgress();
 
         api.onprogress(e.lengthComputable, e.loaded, e.total);
     };
@@ -2588,6 +2610,7 @@ const sendRequest = (data, url, options) => {
     xhr.onload = () => {
         // is classified as valid response
         if (xhr.status >= 200 && xhr.status < 300) {
+            gotProgress(true);
             api.onload(xhr);
         } else {
             api.onerror(xhr);
@@ -2608,11 +2631,6 @@ const sendRequest = (data, url, options) => {
 
     // open up open up!
     xhr.open(options.method, url, true);
-
-    // set timeout if defined (do it after open so IE11 plays ball)
-    if (isInt(options.timeout)) {
-        xhr.timeout = options.timeout;
-    }
 
     // add headers
     Object.keys(options.headers).forEach(key => {
