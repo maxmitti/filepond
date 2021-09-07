@@ -22,8 +22,6 @@ import getItemsPerRow from '../utils/getItemsPerRow';
 
 const MAX_FILES_LIMIT = 1000000;
 
-const prevent = e => e.preventDefault();
-
 const create = ({ root, props }) => {
     // Add id
     const id = root.query('GET_ID');
@@ -89,14 +87,6 @@ const create = ({ root, props }) => {
     // history of updates
     root.ref.previousAspectRatio = null;
     root.ref.updateHistory = [];
-
-    // prevent scrolling and zooming on iOS (only if supports pointer events, for then we can enable reorder)
-    const canHover = window.matchMedia('(pointer: fine) and (hover: hover)').matches;
-    const hasPointerEvents = 'PointerEvent' in window;
-    if (root.query('GET_ALLOW_REORDER') && hasPointerEvents && !canHover) {
-        root.element.addEventListener('touchmove', prevent, { passive: false });
-        root.element.addEventListener('gesturestart', prevent);
-    }
 
     // add credits
     const credits = root.query('GET_CREDITS');
@@ -645,8 +635,6 @@ export const root = createView({
         if (root.ref.hopper) {
             root.ref.hopper.destroy();
         }
-        root.element.removeEventListener('touchmove', prevent);
-        root.element.removeEventListener('gesturestart', prevent);
     },
     mixins: {
         styles: ['height'],

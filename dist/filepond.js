@@ -8489,6 +8489,10 @@
         };
     };
 
+    var prevent = function prevent(e) {
+        return e.preventDefault();
+    };
+
     var ITEM_TRANSLATE_SPRING = {
         type: 'spring',
         stiffness: 0.75,
@@ -8625,6 +8629,14 @@
         };
 
         root.element.addEventListener('pointerdown', grab);
+
+        // prevent scrolling and zooming on iOS (only if supports pointer events, for then we can enable reorder)
+        var canHover = window.matchMedia('(pointer: fine) and (hover: hover)').matches;
+        var hasPointerEvents = 'PointerEvent' in window;
+        if (root.query('GET_ALLOW_REORDER') && hasPointerEvents && !canHover) {
+            root.element.addEventListener('touchmove', prevent, { passive: false });
+            root.element.addEventListener('gesturestart', prevent);
+        }
     };
 
     var route$1 = createRoute({
@@ -8717,6 +8729,8 @@
             var root = _ref7.root,
                 props = _ref7.props;
             root.element.removeEventListener('click', root.ref.handleClick);
+            root.element.removeEventListener('touchmove', prevent);
+            root.element.removeEventListener('gesturestart', prevent);
             root.dispatch('RELEASE_ITEM', { query: props.id });
         },
         tag: 'li',
@@ -10727,10 +10741,6 @@
 
     var MAX_FILES_LIMIT = 1000000;
 
-    var prevent = function prevent(e) {
-        return e.preventDefault();
-    };
-
     var create$e = function create(_ref) {
         var root = _ref.root,
             props = _ref.props;
@@ -10810,14 +10820,6 @@
         // history of updates
         root.ref.previousAspectRatio = null;
         root.ref.updateHistory = [];
-
-        // prevent scrolling and zooming on iOS (only if supports pointer events, for then we can enable reorder)
-        var canHover = window.matchMedia('(pointer: fine) and (hover: hover)').matches;
-        var hasPointerEvents = 'PointerEvent' in window;
-        if (root.query('GET_ALLOW_REORDER') && hasPointerEvents && !canHover) {
-            root.element.addEventListener('touchmove', prevent, { passive: false });
-            root.element.addEventListener('gesturestart', prevent);
-        }
 
         // add credits
         var credits = root.query('GET_CREDITS');
@@ -11424,8 +11426,6 @@
             if (root.ref.hopper) {
                 root.ref.hopper.destroy();
             }
-            root.element.removeEventListener('touchmove', prevent);
-            root.element.removeEventListener('gesturestart', prevent);
         },
         mixins: {
             styles: ['height'],

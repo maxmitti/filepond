@@ -3,6 +3,8 @@ import { fileWrapper } from './fileWrapper';
 import { panel } from './panel';
 import { createDragHelper } from '../utils/createDragHelper';
 
+const prevent = e => e.preventDefault();
+
 const ITEM_TRANSLATE_SPRING = {
     type: 'spring',
     stiffness: 0.75,
@@ -42,7 +44,7 @@ const create = ({ root, props }) => {
     // set id
     root.element.id = `filepond--item-${props.id}`;
     root.element.addEventListener('click', root.ref.handleClick);
-    
+
     // file view
     root.ref.container = root.appendChildView(
         root.createChildView(fileWrapper, { id: props.id })
@@ -111,7 +113,7 @@ const create = ({ root, props }) => {
 
             root.dispatch('DID_DRAG_ITEM', { id: props.id, dragState });
         };
-    
+
         const drop = e => {
 
             if (!e.isPrimary) return;
@@ -137,6 +139,15 @@ const create = ({ root, props }) => {
     }
 
     root.element.addEventListener('pointerdown', grab);
+
+
+    // prevent scrolling and zooming on iOS (only if supports pointer events, for then we can enable reorder)
+    const canHover = window.matchMedia('(pointer: fine) and (hover: hover)').matches;
+    const hasPointerEvents = 'PointerEvent' in window;
+    if (root.query('GET_ALLOW_REORDER') && hasPointerEvents && !canHover) {
+        root.element.addEventListener('touchmove', prevent, { passive: false });
+        root.element.addEventListener('gesturestart', prevent);
+    }
 };
 
 const route = createRoute({
@@ -176,7 +187,7 @@ const write = createRoute({
 
     // no need to set same state twice
     if (action && action.type !== props.currentState) {
-            
+
         // set current state
         props.currentState = action.type;
 
@@ -195,7 +206,7 @@ const write = createRoute({
     else if (!shouldOptimize) {
         root.height = root.rect.element.width * aspectRatio;
     }
-    
+
     // sync panel height with item height
     if (shouldOptimize) {
         root.ref.panel.height = null;
@@ -209,6 +220,8 @@ export const item = createView({
     write,
     destroy: ({ root, props }) => {
         root.element.removeEventListener('click', root.ref.handleClick);
+        root.element.removeEventListener('touchmove', prevent);
+        root.element.removeEventListener('gesturestart', prevent);
         root.dispatch('RELEASE_ITEM', { query: props.id });
     },
     tag: 'li',

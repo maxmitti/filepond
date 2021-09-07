@@ -5959,6 +5959,8 @@ const createDragHelper = items => {
     };
 };
 
+const prevent = e => e.preventDefault();
+
 const ITEM_TRANSLATE_SPRING = {
     type: 'spring',
     stiffness: 0.75,
@@ -6085,6 +6087,14 @@ const create$7 = ({ root, props }) => {
     };
 
     root.element.addEventListener('pointerdown', grab);
+
+    // prevent scrolling and zooming on iOS (only if supports pointer events, for then we can enable reorder)
+    const canHover = window.matchMedia('(pointer: fine) and (hover: hover)').matches;
+    const hasPointerEvents = 'PointerEvent' in window;
+    if (root.query('GET_ALLOW_REORDER') && hasPointerEvents && !canHover) {
+        root.element.addEventListener('touchmove', prevent, { passive: false });
+        root.element.addEventListener('gesturestart', prevent);
+    }
 };
 
 const route$1 = createRoute({
@@ -6159,6 +6169,8 @@ const item = createView({
     write: write$4,
     destroy: ({ root, props }) => {
         root.element.removeEventListener('click', root.ref.handleClick);
+        root.element.removeEventListener('touchmove', prevent);
+        root.element.removeEventListener('gesturestart', prevent);
         root.dispatch('RELEASE_ITEM', { query: props.id });
     },
     tag: 'li',
@@ -7954,8 +7966,6 @@ const debounce = (func, interval = 16, immidiateOnly = true) => {
 
 const MAX_FILES_LIMIT = 1000000;
 
-const prevent = e => e.preventDefault();
-
 const create$e = ({ root, props }) => {
     // Add id
     const id = root.query('GET_ID');
@@ -8021,14 +8031,6 @@ const create$e = ({ root, props }) => {
     // history of updates
     root.ref.previousAspectRatio = null;
     root.ref.updateHistory = [];
-
-    // prevent scrolling and zooming on iOS (only if supports pointer events, for then we can enable reorder)
-    const canHover = window.matchMedia('(pointer: fine) and (hover: hover)').matches;
-    const hasPointerEvents = 'PointerEvent' in window;
-    if (root.query('GET_ALLOW_REORDER') && hasPointerEvents && !canHover) {
-        root.element.addEventListener('touchmove', prevent, { passive: false });
-        root.element.addEventListener('gesturestart', prevent);
-    }
 
     // add credits
     const credits = root.query('GET_CREDITS');
@@ -8577,8 +8579,6 @@ const root = createView({
         if (root.ref.hopper) {
             root.ref.hopper.destroy();
         }
-        root.element.removeEventListener('touchmove', prevent);
-        root.element.removeEventListener('gesturestart', prevent);
     },
     mixins: {
         styles: ['height'],
